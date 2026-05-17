@@ -14,6 +14,11 @@ gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
 REPO
 EOF
 
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
+
 # deps
 RUN --mount=type=cache,target=/var/cache/libdnf5,rw \
   dnf -y --nodocs --setopt=install_weak_deps=False \
