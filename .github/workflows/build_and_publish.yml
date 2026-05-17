@@ -41,7 +41,7 @@ jobs:
   # 2) Build each backend in parallel using the prepared matrix
   build-and-push:
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-full
     strategy:
       fail-fast: false
       matrix:
