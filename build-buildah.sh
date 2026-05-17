@@ -10,12 +10,15 @@ cd toolboxes
 buildah bud \
     --squash \
     --format oci \
+    --layers \
     --cache-from "${BUILD_CACHE}" \
     --cache-to "${BUILD_CACHE}" \
     -t "${CONTAINER_REPO}:${TAG}" \
     -f Dockerfile.rocm-7.2.3
-echo push rocm7.2.3
 
-buildah push \
-    --compression-format zstd:chunked  \
-    gitea.wefers.page/julian/amd-strix-halo-toolboxes:rocm-7.2.3
+if [ $? -eq 0 ]; then
+    echo push rocm7.2.3
+    buildah push \
+        --compression-format zstd:chunked  \
+        "${CONTAINER_REPO}:${TAG}"
+fi
