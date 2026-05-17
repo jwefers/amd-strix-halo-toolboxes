@@ -86,12 +86,13 @@ jobs:
           TAG="${NAME}_${BUILD_TS}"
           IMM="${CONTAINER_REPO}:${TAG}"
           CHN="${CONTAINER_REPO}:${NAME}"
-          BUILD_CACHE="${CONTAINER_REPO}:buildcache"
+          BUILD_CACHE="${CONTAINER_REPO}"
 
           echo "→ Building ${DF}"
           buildah bud \
             --squash \
             --format oci \
+            --layers \
             --cache-from "${BUILD_CACHE}" \
             --cache-to "${BUILD_CACHE}" \
             -t "${LI}" \
@@ -104,7 +105,7 @@ jobs:
 
           echo "→ Tag & push immutable → ${IMM}"
           buildah tag "${LI}" "${IMM}"
-          buildah push --compression-format zstd:chunked push "${IMM}"
+          buildah push --compression-format zstd:chunked "${IMM}"
 
           echo "→ Tag & push channel → ${CHN}"
           buildah tag "${IMM}" "${CHN}"
