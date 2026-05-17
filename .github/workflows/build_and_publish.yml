@@ -69,7 +69,7 @@ jobs:
 
       - name: Log in to gitea.wefers.page
         run: |
-          podman login gitea.wefers.page -u  ${{ secrets.REGISTRY_USERNAME}} -p ${{ secrets.REGISTRY_PASSWORD }}
+          podman --remote login gitea.wefers.page -u  ${{ secrets.REGISTRY_USERNAME}} -p ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Set build timestamp
         run: echo "BUILD_TS=$(date +%Y%m%dT%H%M%S)" >> $GITHUB_ENV
