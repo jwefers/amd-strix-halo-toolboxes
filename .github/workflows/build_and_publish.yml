@@ -12,6 +12,7 @@ on:
 
 env:
   DOCKERHUB_REPO: docker.io/kyuz0/amd-strix-halo-toolboxes
+  DOCKERHUB_BUILDCACHE: docker.io/kyuz0/amd-strix-halo-toolboxes-buildcache
   LOCAL_PREFIX: llama
 
 jobs:
@@ -85,11 +86,13 @@ jobs:
 
           echo "→ Building ${DF}"
           buildah bud \
+            --pull \
             --squash \
             --format oci \
             --layers \
-            --cache-from "${DOCKERHUB_REPO}" \
-            --cache-to "${DOCKERHUB_REPO}" \
+            --no-cache \
+            --cache-from "${DOCKERHUB_BUILDCACHE}" \
+            --cache-to "${DOCKERHUB_BUILDCACHE}" \
             -t "${LI}" \
             -f "${DF}" \
             .
