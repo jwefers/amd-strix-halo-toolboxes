@@ -103,9 +103,9 @@ jobs:
           docker run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
 
           echo "→ Tag & push immutable → ${IMM}"
-          podman tag "${LI}" "${IMM}"
+          buildah tag "${LI}" "${IMM}"
           buildah push --compression-format zstd:chunked push "${IMM}"
 
           echo "→ Tag & push channel → ${CHN}"
-          podman tag "${IMM}" "${CHN}"
+          buildah tag "${IMM}" "${CHN}"
           buildah push --compression-format zstd:chunked "${CHN}"
