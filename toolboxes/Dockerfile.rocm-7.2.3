@@ -38,9 +38,9 @@ ENV ROCM_PATH=/opt/rocm \
   PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
 
 # llama.cpp
+WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-WORKDIR /opt/llama.cpp
 RUN --mount=type=cache,target=/opt/llama.cpp,rw \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/opt/llama.cpp,rw \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
-  && patch -p1 < /tmp/llama-grammar.patch  \
+  && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build \
   -DGGML_HIP=ON \
   -DCMAKE_HIP_FLAGS="--rocm-path=/opt/rocm -mllvm --amdgpu-unroll-threshold-local=600" \
@@ -104,9 +104,6 @@ RUN --mount=type=cache,target=/var/cache/libdnf5,rw \
 
 # copy
 COPY --from=builder /usr/local/ /usr/local/
-
-# not needed, as rpc-server is already installed by cmake --install into usr/local, which we just copied over
-# COPY --from=builder /opt/llama.cpp/build/bin/rpc-* /usr/local/bin/
 
 # ld
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
