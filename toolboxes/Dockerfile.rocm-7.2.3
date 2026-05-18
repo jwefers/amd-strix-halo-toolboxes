@@ -41,13 +41,13 @@ ENV ROCM_PATH=/opt/rocm \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=cache,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp,rw \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN --mount=type=cache,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp,rw \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
@@ -67,7 +67,7 @@ RUN --mount=type=cache,target=/opt/llama.cpp,rw \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=cache,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp,rw \
   mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
