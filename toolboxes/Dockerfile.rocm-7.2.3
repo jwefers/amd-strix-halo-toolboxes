@@ -77,7 +77,7 @@ COPY gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
 RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
 
 # runtime stage
-FROM registry.fedoraproject.org/fedora-minimal:43
+FROM registry.fedoraproject.org/fedora-minimal:43 AS runtime
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # rocm 7.2.3 repo
@@ -122,5 +122,14 @@ RUN printf '%s\n' \
   > /etc/profile.d/rocm.sh && chmod +x /etc/profile.d/rocm.sh \
   && echo 'source /etc/profile.d/rocm.sh' >> /etc/bashrc
 
-# shell
-CMD ["/bin/bash"]
+# # shell
+# CMD ["/bin/bash"]
+
+FROM quay.io/coreos/chunkah AS chunkah
+ARG CHUNKAH_CONFIG_STR
+RUN --mount=from=runtime,src=/,target=/chunkah,ro \
+    --mount=type=bind,target=/run/src,rw \
+        chunkah build > /run/src/out.ociarchive
+
+FROM oci-archive:out.ociarchive
+ENTRYPOINT ["/bin/bash"]

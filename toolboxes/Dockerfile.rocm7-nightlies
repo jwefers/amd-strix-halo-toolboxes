@@ -25,11 +25,15 @@ RUN --mount=type=cache,id=rocm-nightlies-tmp,target=/tmp \
   | grep -o "therock-dist-linux-${GFX}-${ROCM_MAJOR_VER}\..*\.tar\.gz" \
   | sort -V | tail -n1)"; \
   echo "Latest tarball: ${KEY}"; \
-  test -f "therock-${KEY}.tar.gz" \
-  || aria2c -x 16 -s 16 -j 16 --file-allocation=none "${BASE}/${KEY}" -o "therock-${KEY}.tar.gz"; \
-  ln -s "therock-${KEY}.tar.gz" "therock.tar.gz"; \
+  FILENAME="therock-${KEY}.tar.gz"; \
+  if [ -f "$FILENAME" ]; then \
+    echo "no new build available, using cached tarball"; \
+  else \
+    echo "downloading..."; \
+    aria2c -x 16 -s 16 -j 16 --file-allocation=none "${BASE}/${KEY}" -o "$FILENAME"; \
+  fi; \
   mkdir -p /opt/rocm-7.0 \
-  && tar xzf therock.tar.gz -C /opt/rocm-7.0 --strip-components=1
+  && tar xzf "$FILENAME" -C /opt/rocm-7.0 --strip-components=1
 
 ENV ROCM_PATH=/opt/rocm-7.0 \
   HIP_PLATFORM=amd \
