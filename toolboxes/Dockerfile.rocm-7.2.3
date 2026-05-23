@@ -122,14 +122,5 @@ RUN printf '%s\n' \
   > /etc/profile.d/rocm.sh && chmod +x /etc/profile.d/rocm.sh \
   && echo 'source /etc/profile.d/rocm.sh' >> /etc/bashrc
 
-# # shell
-# CMD ["/bin/bash"]
-
-FROM quay.io/coreos/chunkah AS chunkah
-ARG CHUNKAH_CONFIG_STR
-RUN --mount=from=runtime,src=/,target=/chunkah,ro \
-    --mount=type=bind,target=/run/src,rw \
-        chunkah build > /run/src/out.ociarchive
-
-FROM oci-archive:out.ociarchive
-ENTRYPOINT ["/bin/bash"]
+# shell
+CMD ["/bin/bash"]
