@@ -85,6 +85,21 @@ jobs:
           CHN="${DOCKERHUB_REPO}:${NAME}"
 
           echo "→ Building ${DF}"
+
+          # we use buildah to eventually make use of pushing with
+          # zstd:chunked compression, which is much more efficient
+          # than dockers gzip format.
+          # --pull: ensure we use the latest version of the base image
+          # --squash: flatten the final result image into one single layer.
+          #           Avoids large image sizes due to intermediate files
+          #            that are irrelevant for the user
+          # --format oci: use the OCI image format, which allows for pushing with zstd:chunked
+          # --layers: cache intermediate layers. Probably irrelevant for ephemeral builder.
+          #           Is independent of squash, which only affects the final image.
+          # --no-cache: Recompute every step in the dockerfile, even if the previous layer
+          #             has not ben invalidated. Needed since we pull from ze internet.
+          # --cache-(to|from): pull/push the intermedia cache layers resulting from
+          #                    --mount options in the Dockerfile
           buildah bud \
             --pull \
             --squash \
@@ -98,9 +113,11 @@ jobs:
             .
 
           echo "→ Running smoke test..."
-          docker run --rm "${LI}" llama version
-          docker run --rm "${LI}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
-          docker run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+          podman run --rm "${LI}" llama version
+          podman run --rm "${LI}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+          podman run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+
+          push with zstd:chunked compression, see https://github.com/containers/storage/blob/main/docs/containers-storage-zstd-chunked.md
 
           echo "→ Tag & push immutable → ${IMM}"
           buildah tag "${LI}" "${IMM}"
