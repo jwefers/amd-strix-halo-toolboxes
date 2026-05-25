@@ -17,13 +17,13 @@ RUN --mount=type=cache,target=/var/cache/libdnf5,rw \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
@@ -36,7 +36,7 @@ RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp,rw \
   -DLLAMA_BUILD_TESTS=OFF \
   -DLLAMA_BUILD_EXAMPLES=ON \
   -DLLAMA_BUILD_SERVER=ON \
-  && cmake --build build --config Release \
+  && cmake --build build --config Release -- -j$(nproc) \
   && cmake --install build --config Release
 
 # libs
