@@ -73,8 +73,11 @@ jobs:
           path: ~/.local/share/containers/storage
 
       - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          podman login gitea.wefers.page -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
+          podman login gitea.wefers.page -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_TOKEN"
 
       - name: Set build timestamp
         run: echo "BUILD_TS=$(date +%Y%m%dT%H%M%S)" >> $GITHUB_ENV
