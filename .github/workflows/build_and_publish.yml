@@ -138,10 +138,10 @@ jobs:
 
           # push with zstd:chunked compression, see https://github.com/containers/storage/blob/main/docs/containers-storage-zstd-chunked.md
 
-          echo "→ Tag & push immutable → ${IMM}"
-          buildah tag "${LI}" "${IMM}"
-          buildah push --compression-format zstd:chunked "${IMM}"
+          # echo "→ Tag & push immutable → ${IMM}"
+          # buildah tag "${LI}" "${IMM}"
+          # buildah push --compression-format zstd:chunked "${IMM}"
 
-          echo "→ Tag & push channel → ${CHN}"
-          buildah tag "${IMM}" "${CHN}"
-          buildah push --compression-format zstd:chunked "${CHN}"
+          # echo "→ Tag & push channel → ${CHN}"
+          # buildah tag "${IMM}" "${CHN}"
+          # buildah push --compression-format zstd:chunked "${CHN}"
