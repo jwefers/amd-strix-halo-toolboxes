@@ -7,7 +7,7 @@ FROM registry.fedoraproject.org/fedora:43 AS builder
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps + rocm toolchain (native fedora packages)
-RUN --mount=type=cache,id=dnf-644,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel \
@@ -28,7 +28,7 @@ RUN --mount=type=cache,id=rocm-644,target=/opt/llama.cpp \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
-  && patch -p1 < /tmp/llama-grammar.patch  \
+  && patch -p1 < /tmp/llama-grammar.patch \
   && HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
   cmake -S . -B build \
   -DGGML_HIP=ON \
@@ -50,7 +50,7 @@ FROM registry.fedoraproject.org/fedora-minimal:43
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps (native fedora rocm + utilities)
-RUN --mount=type=cache,id=dnf-644,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   install \
   bash ca-certificates libatomic libstdc++ libgcc libgomp sudo \
