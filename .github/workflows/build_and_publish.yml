@@ -12,7 +12,6 @@ on:
 
 env:
   DOCKERHUB_REPO: docker.io/kyuz0/amd-strix-halo-toolboxes
-  DOCKERHUB_BUILDCACHE: docker.io/kyuz0/amd-strix-halo-toolboxes-buildcache
   LOCAL_PREFIX: llama
 
 jobs:
@@ -64,6 +63,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
 
+      - name: Cache podman storage for ${{ matrix.backend }}
+        uses: actions/cache@v5
+        with:
+          key: podman-storage-${{ matrix.backend }}
+          restore-keys: |
+            podman-storage-${{ matrix.backend }}
+            podman-storage
+          path: ~/.local/share/containers/storage
+
       - name: Log in to Docker Hub
         run: |
           podman login -u ${{ secrets.DOCKERHUB_USERNAME}} -p ${{ secrets.DOCKERHUB_TOKEN }}
@@ -94,8 +102,6 @@ jobs:
           #           Avoids large image sizes due to intermediate files
           #            that are irrelevant for the user
           # --format oci: use the OCI image format, which allows for pushing with zstd:chunked
-          # --layers: cache intermediate layers. Probably irrelevant for ephemeral builder.
-          #           Is independent of squash, which only affects the final image.
           # --no-cache: Recompute every step in the dockerfile, even if the previous layer
           #             has not ben invalidated. Needed since we pull from ze internet.
           # --cache-(to|from): pull/push the intermedia cache layers resulting from
@@ -113,10 +119,7 @@ jobs:
             --pull \
             --squash \
             --format oci \
-            --layers \
             --no-cache \
-            --cache-from "${DOCKERHUB_BUILDCACHE}" \
-            --cache-to "${DOCKERHUB_BUILDCACHE}" \
             -t "${LI}" \
             -f "${DF}" \
             .
