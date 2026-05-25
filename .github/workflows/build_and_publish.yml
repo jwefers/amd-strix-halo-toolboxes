@@ -74,10 +74,10 @@ jobs:
 
       - name: Log in to Docker Hub
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
-          podman login gitea.wefers.page -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_TOKEN"
+          podman login gitea.wefers.page -u "$REGISTRY_USERNAME" -p "$REGISTRY_PASSWORD"
 
       - name: Set build timestamp
         run: echo "BUILD_TS=$(date +%Y%m%dT%H%M%S)" >> $GITHUB_ENV
