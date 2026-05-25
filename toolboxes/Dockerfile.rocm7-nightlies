@@ -1,16 +1,29 @@
 # build
 FROM registry.fedoraproject.org/fedora:43 AS builder
 
-RUN dnf -y --nodocs --setopt=install_weak_deps=False install \
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
+
+# we keep the dnf cache as a docker mount, which is shared
+# between layers and also between the various dockerfiles.
+# We can thus reuse the already-downloaded dnf packages
+# on subsequent runs, and the cache will NOT be part of
+# the resulting image, so we don't need to dnf clean.
+RUN --mount=type=cache,id=dnf-nightlies,target=/var/cache/libdnf5 \
+  dnf -y --nodocs --setopt=install_weak_deps=False install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel \
-  radeontop git vim patch curl ninja-build tar xz aria2c \
-  && dnf clean all && rm -rf /var/cache/dnf/*
+  radeontop git vim patch curl ninja-build tar xz aria2c
 
 # find & fetch the latest Linux 7.x.x tarball (gfx1151)
 WORKDIR /tmp
 ARG ROCM_MAJOR_VER=7
 ARG GFX=gfx1151
-RUN set -euo pipefail; \
+# We cache the downloaded tarball to avoid redownloading
+# if no newer version is present.
+RUN --mount=type=cache,id=rocm-nightlies-tmp,target=/tmp \
+  set -euo pipefail; \
   BASE="https://therock-nightly-tarball.s3.amazonaws.com"; \
   PREFIX="therock-dist-linux-${GFX}-${ROCM_MAJOR_VER}"; \
   KEY="$(curl -s "${BASE}?list-type=2&prefix=${PREFIX}" \
@@ -18,9 +31,15 @@ RUN set -euo pipefail; \
   | grep -o "therock-dist-linux-${GFX}-${ROCM_MAJOR_VER}\..*\.tar\.gz" \
   | sort -V | tail -n1)"; \
   echo "Latest tarball: ${KEY}"; \
-  aria2c -x 16 -s 16 -j 16 --file-allocation=none "${BASE}/${KEY}" -o therock.tar.gz
-RUN mkdir -p /opt/rocm-7.0 \
-  && tar xzf therock.tar.gz -C /opt/rocm-7.0 --strip-components=1
+  FILENAME="therock-${KEY}.tar.gz"; \
+  if [ -f "$FILENAME" ]; then \
+    echo "no new build available, using cached tarball"; \
+  else \
+    echo "downloading..."; \
+    aria2c -x 16 -s 16 -j 16 --file-allocation=none "${BASE}/${KEY}" -o "$FILENAME"; \
+  fi; \
+  mkdir -p /opt/rocm-7.0 \
+  && tar xzf "$FILENAME" -C /opt/rocm-7.0 --strip-components=1
 
 ENV ROCM_PATH=/opt/rocm-7.0 \
   HIP_PLATFORM=amd \
@@ -33,7 +52,7 @@ ENV ROCM_PATH=/opt/rocm-7.0 \
   LD_LIBRARY_PATH=/opt/rocm-7.0/lib:/opt/rocm-7.0/lib64:/opt/rocm-7.0/llvm/lib \
   LIBRARY_PATH=/opt/rocm-7.0/lib:/opt/rocm-7.0/lib64 \
   CPATH=/opt/rocm-7.0/include \
-  PKG_CONFIG_PATH=/opt/rocm-7.0/lib/pkgconfig 
+  PKG_CONFIG_PATH=/opt/rocm-7.0/lib/pkgconfig
 
 RUN printf '%s\n' \
   'export ROCM_PATH=/opt/rocm-7.0' \
@@ -55,13 +74,17 @@ RUN printf '%s\n' \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN git clone -b ${BRANCH} --single-branch --recursive ${REPO} . \
-  && git clean -xdf \
-  && git submodule update --recursive
+RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+  test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
-RUN patch -p1 < /tmp/llama-grammar.patch \
+# build
+RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+  git reset --hard \
+  && git pull \
+  && git submodule update --recursive \
+  && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build \
   -DGGML_HIP=ON \
   -DAMDGPU_TARGETS=gfx1151 \
@@ -71,21 +94,29 @@ RUN patch -p1 < /tmp/llama-grammar.patch \
   && cmake --build build --config Release -- -j$(nproc) \
   && cmake --install build --config Release
 
+# libs
+RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+  mkdir -p /usr/local/lib64 \
+  && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
+  && ldconfig
+
 # keep bin; drop headers/docs/static libs (retain llama.cpp for rpc binaries)
-RUN find /opt/rocm-7.0 -type f -name '*.a' -delete \
+# TODO: combine with above nightly tarball download
+RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+  find /opt/rocm-7.0 -type f -name '*.a' -delete \
   && rm -rf /opt/rocm-7.0/include /opt/rocm-7.0/share \
   /opt/rocm-7.0/llvm/include /opt/rocm-7.0/llvm/share
 
 # runtime
 FROM registry.fedoraproject.org/fedora-minimal:43
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 install \
-  bash ca-certificates libatomic libstdc++ libgcc radeontop vim procps-ng \
-  && microdnf clean all && rm -rf /var/cache/dnf/*
+RUN --mount=type=cache,id=dnf-nightlies,target=/var/cache/libdnf5 \
+  microdnf -y --nodocs --setopt=install_weak_deps=0 install \
+  bash ca-certificates libatomic libstdc++ libgcc radeontop vim procps-ng
 
 COPY --from=builder /opt/rocm-7.0 /opt/rocm-7.0
 COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /opt/llama.cpp/build/bin/rpc-* /usr/local/bin/
 
 COPY gguf-vram-estimator.py /usr/local/bin/
 RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
@@ -123,6 +154,9 @@ RUN printf '%s\n' \
 # make /usr/local libs visible without touching env
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
   && echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf \
+  && ldconfig \
+  && cp -n /usr/local/lib/libllama*.so* /usr/lib64/ 2>/dev/null || true \
+  && cp -n /usr/local/lib64/libllama*.so* /usr/lib64/ 2>/dev/null || true \
   && ldconfig
 
 CMD ["/bin/bash"]

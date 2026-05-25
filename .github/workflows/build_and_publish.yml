@@ -11,7 +11,7 @@ on:
         default: all
 
 env:
-  DOCKERHUB_REPO: docker.io/kyuz0/amd-strix-halo-toolboxes
+  DOCKERHUB_REPO: gitea.wefers.page/julian/amd-strix-halo-toolboxes
   LOCAL_PREFIX: llama
 
 jobs:
@@ -63,11 +63,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Cache podman storage for ${{ matrix.backend }}
+        uses: actions/cache@v5
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          key: podman-storage-${{ matrix.backend }}
+          restore-keys: |
+            podman-storage-${{ matrix.backend }}
+            podman-storage
+          path: ~/.local/share/containers/storage
+
+      - name: Log in to Docker Hub
+        run: |
+          podman login -u ${{ secrets.DOCKERHUB_USERNAME}} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set build timestamp
         run: echo "BUILD_TS=$(date +%Y%m%dT%H%M%S)" >> $GITHUB_ENV
@@ -86,12 +93,48 @@ jobs:
           CHN="${DOCKERHUB_REPO}:${NAME}"
 
           echo "→ Building ${DF}"
-          docker build --no-cache -t "${LI}" -f "${DF}" .
+
+          # we use buildah to eventually make use of pushing with
+          # zstd:chunked compression, which is much more efficient
+          # than dockers gzip format.
+          # --pull: ensure we use the latest version of the base image
+          # --squash: flatten the final result image into one single layer.
+          #           Avoids large image sizes due to intermediate files
+          #            that are irrelevant for the user
+          # --format oci: use the OCI image format, which allows for pushing with zstd:chunked
+          # --no-cache: Recompute every step in the dockerfile, even if the previous layer
+          #             has not ben invalidated. Needed since we pull from ze internet.
+          # --cache-(to|from): pull/push the intermedia cache layers resulting from
+          #                    --mount options in the Dockerfile
+          # NOTE: we are mounting cache layers for dnf and pushing them. This cache
+          #       layer is shared amongst all Dockerfiles, since they have the identical
+          #       mount parameter. When parallel building with buildah, those cache layers
+          #       compete. In parallel, they all pull the latest fitting cache, then maybe
+          #       add some packages relevant to their specific variant, then afterwards push
+          #       the cache again. When multiple buildahs push the dnf cache, they could invalidate
+          #       the just-pushed cache of another builder instance, so some packages might
+          #       always be missing. SOLUTION: we give each containers dnf cache an individual
+          #       id, thus cache per variant.
+          buildah bud \
+            --pull \
+            --squash \
+            --format oci \
+            --no-cache \
+            -t "${LI}" \
+            -f "${DF}" \
+            .
+
+          echo "→ Running smoke test..."
+          podman run --rm "${LI}" llama version
+          podman run --rm "${LI}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+          podman run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+
+          # push with zstd:chunked compression, see https://github.com/containers/storage/blob/main/docs/containers-storage-zstd-chunked.md
 
           echo "→ Tag & push immutable → ${IMM}"
-          docker tag "${LI}" "${IMM}"
-          docker push "${IMM}"
+          buildah tag "${LI}" "${IMM}"
+          buildah push --compression-format zstd:chunked "${IMM}"
 
           echo "→ Tag & push channel → ${CHN}"
-          docker tag "${IMM}" "${CHN}"
-          docker push "${CHN}"
+          buildah tag "${IMM}" "${CHN}"
+          buildah push --compression-format zstd:chunked "${CHN}"

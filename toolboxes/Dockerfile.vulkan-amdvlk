@@ -1,30 +1,40 @@
 # build stage
 FROM registry.fedoraproject.org/fedora:43 AS builder
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN dnf -y --nodocs --setopt=install_weak_deps=False install \
+RUN --mount=type=cache,id=dnf-amdvlk,target=/var/cache/libdnf5 \
+  dnf -y --nodocs --setopt=install_weak_deps=False install \
   git vim \
   make gcc cmake ninja-build lld clang clang-devel compiler-rt libcurl-devel \
   vulkan-loader-devel vulkaninfo mesa-vulkan-drivers \
-  spirv-headers-devel radeontop glslc wget patch \
-  && dnf clean all && rm -rf /var/cache/dnf/*
+  spirv-headers-devel radeontop glslc wget patch
 
 # amdvlk
-RUN curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
+RUN \
+  --mount=type=cache,id=vulkan-radv-tmp,target=/tmp \
+  --mount=type=cache,id=dnf-amdvlk,target=/var/cache/libdnf5 \
+  test -f /tmp/amdvlk-2025.Q2.1.x86_64.rpm || \
+  curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
   https://github.com/GPUOpen-Drivers/AMDVLK/releases/download/v-2025.Q2.1/amdvlk-2025.Q2.1.x86_64.rpm \
-  && dnf -y install /tmp/amdvlk-*.rpm \
-  && rm -f /tmp/amdvlk-*.rpm
+  && dnf -y install /tmp/amdvlk-*.rpm
 
 # llama.cpp
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
+RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp \
+  test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN git clean -xdf \
+RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp \
+  git reset --hard \
+  && git pull \
   && git submodule update --recursive \
   && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build -G Ninja \
@@ -35,11 +45,12 @@ RUN git clean -xdf \
   -DLLAMA_BUILD_TESTS=OFF \
   -DLLAMA_BUILD_EXAMPLES=ON \
   -DLLAMA_BUILD_SERVER=ON \
-  && cmake --build build --config Release \
+  && cmake --build build --config Release -- -j$(nproc) \
   && cmake --install build --config Release
 
 # libs
-RUN find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/lib64/ \; \
+RUN --mount=type=cache,id=vulkan-radv,target=/opt/llama.cpp \
+  find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/lib64/ \; \
   && ldconfig
 
 # helper
@@ -49,23 +60,25 @@ RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
 
 # runtime stage
 FROM registry.fedoraproject.org/fedora-minimal:43
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 install \
+RUN --mount=type=cache,id=dnf-amdvlk,target=/var/cache/libdnf5 \
+  microdnf -y --nodocs --setopt=install_weak_deps=0 install \
   bash ca-certificates libatomic libstdc++ libgcc \
-  vulkan-loader vulkan-loader-devel vulkaninfo mesa-vulkan-drivers radeontop procps-ng \
-  && microdnf clean all && rm -rf /var/cache/dnf/*
+  vulkan-loader vulkan-loader-devel vulkaninfo mesa-vulkan-drivers radeontop procps-ng
 
-# amdvlk
-RUN curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
+RUN \
+  --mount=type=cache,id=vulkan-radv-tmp,target=/tmp \
+  --mount=type=cache,id=dnf-amdvlk,target=/var/cache/libdnf5 \
+  test -f /tmp/amdvlk-2025.Q2.1.x86_64.rpm || \
+  curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
   https://github.com/GPUOpen-Drivers/AMDVLK/releases/download/v-2025.Q2.1/amdvlk-2025.Q2.1.x86_64.rpm \
-  && microdnf -y install /tmp/amdvlk-*.rpm \
-  && rm -f /tmp/amdvlk-*.rpm
+  && dnf -y install /tmp/amdvlk-*.rpm
 
 # copy
 COPY --from=builder /usr/ /usr/
 COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /opt/llama.cpp/build/bin/rpc-* /usr/local/bin/
 
 # ld
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \

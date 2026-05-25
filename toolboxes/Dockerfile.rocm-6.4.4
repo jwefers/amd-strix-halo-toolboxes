@@ -1,24 +1,32 @@
 # build stage
 FROM registry.fedoraproject.org/fedora:43 AS builder
 
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
+
 # deps + rocm toolchain (native fedora packages)
-RUN dnf -y --nodocs --setopt=install_weak_deps=False \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+  dnf -y --nodocs --setopt=install_weak_deps=False \
   install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel \
   rocminfo radeontop 'rocm-*' 'rocblas-*' hipblas 'hipblas-*' \
-  git vim rsync sudo tar xz patch \
-  && dnf clean all && rm -rf /var/cache/dnf/*
+  git vim rsync sudo tar xz patch
 
 # llama.cpp
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
+RUN --mount=type=cache,id=rocm-644,target=/opt/llama.cpp \
+  test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build + install
-RUN git clean -xdf \
+RUN --mount=type=cache,id=rocm-644,target=/opt/llama.cpp \
+  git reset --hard \
+  && git pull \
   && git submodule update --recursive \
   && patch -p1 < /tmp/llama-grammar.patch \
   && HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
@@ -32,30 +40,33 @@ RUN git clean -xdf \
   && cmake --install build --config Release
 
 # libs
-RUN find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/lib64/ \; \
+RUN --mount=type=cache,id=rocm-644,target=/opt/llama.cpp \
+  mkdir -p /usr/local/lib64 \
+  && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
 
 # runtime stage
 FROM registry.fedoraproject.org/fedora-minimal:43
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps (native fedora rocm + utilities)
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+  microdnf -y --nodocs --setopt=install_weak_deps=0 \
   install \
   bash ca-certificates libatomic libstdc++ libgcc libgomp sudo \
   rocminfo radeontop 'rocm-*' 'rocblas-*' hipblas 'hipblas-*' \
-  procps-ng \
-  && microdnf clean all && rm -rf /var/cache/dnf/*
+  procps-ng
 
 # copy
 COPY --from=builder /usr/local/ /usr/local/
 COPY --from=builder /usr/include/rocwmma /usr/include/rocwmma
-COPY --from=builder /opt/llama.cpp/build/bin/rpc-* /usr/local/bin/
 
 # ld
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
   && echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf \
   && ldconfig \
   && cp -n /usr/local/lib/libllama*.so* /usr/lib64/ 2>/dev/null || true \
+  && cp -n /usr/local/lib64/libllama*.so* /usr/lib64/ 2>/dev/null || true \
   && ldconfig
 
 # helper

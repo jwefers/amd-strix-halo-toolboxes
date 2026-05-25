@@ -14,16 +14,21 @@ gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
 REPO
 EOF
 
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
+
 # deps
-RUN dnf -y --nodocs --setopt=install_weak_deps=False \
+RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
+  dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel ninja-build \
   rocm-llvm rocm-device-libs hip-runtime-amd hip-devel \
   rocblas rocblas-devel hipblas hipblas-devel rocm-cmake libomp-devel libomp \
   rocminfo radeontop \
-  git-core vim sudo rsync patch \
-  && dnf clean all && rm -rf /var/cache/dnf/*
+  git-core vim sudo rsync patch
 
 # rocm env
 ENV ROCM_PATH=/opt/rocm \
@@ -36,12 +41,15 @@ ENV ROCM_PATH=/opt/rocm \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+  test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN git clean -xdf \
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+  git reset --hard \
+  && git pull \
   && git submodule update --recursive \
   && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build \
@@ -59,7 +67,9 @@ RUN git clean -xdf \
   && cmake --install build --config Release
 
 # libs
-RUN find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/lib64/ \; \
+RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+  mkdir -p /usr/local/lib64 \
+  && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
 
 # helper
@@ -67,7 +77,8 @@ COPY gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
 RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
 
 # runtime stage
-FROM registry.fedoraproject.org/fedora-minimal:43
+FROM registry.fedoraproject.org/fedora-minimal:43 AS runtime
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # rocm 7.2.3 repo
 RUN <<'EOF'
@@ -83,23 +94,23 @@ REPO
 EOF
 
 # runtime deps
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 \
+RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
+  microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
   bash ca-certificates libatomic libstdc++ libgcc libgomp sudo \
   hip-runtime-amd rocblas hipblas \
-  rocminfo radeontop procps-ng \
-  && microdnf clean all && rm -rf /var/cache/dnf/*
+  rocminfo radeontop procps-ng
 
 # copy
 COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /opt/llama.cpp/build/bin/rpc-* /usr/local/bin/
 
 # ld
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
   && echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf \
   && ldconfig \
   && cp -n /usr/local/lib/libllama*.so* /usr/lib64/ 2>/dev/null || true \
+  && cp -n /usr/local/lib64/libllama*.so* /usr/lib64/ 2>/dev/null || true \
   && ldconfig
 
 # helper
