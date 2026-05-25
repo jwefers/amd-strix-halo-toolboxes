@@ -6,7 +6,7 @@ FROM registry.fedoraproject.org/fedora:43 AS builder
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,id=dnf-radv,target=/var/cache/libdnf5 \
   dnf -y --nodocs --setopt=install_weak_deps=False install \
   git vim \
   make gcc cmake ninja-build lld clang clang-devel compiler-rt libcurl-devel \
@@ -54,7 +54,7 @@ FROM registry.fedoraproject.org/fedora-minimal:43
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,id=dnf-radv,target=/var/cache/libdnf5 \
   microdnf -y --nodocs --setopt=install_weak_deps=0 install \
   bash ca-certificates libatomic libstdc++ libgcc \
   vulkan-loader vulkan-loader-devel vulkaninfo mesa-vulkan-drivers radeontop procps-ng

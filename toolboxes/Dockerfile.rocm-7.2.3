@@ -20,7 +20,7 @@ EOF
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
@@ -94,7 +94,7 @@ REPO
 EOF
 
 # runtime deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \

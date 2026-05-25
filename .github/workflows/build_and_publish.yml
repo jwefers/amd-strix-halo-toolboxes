@@ -107,7 +107,8 @@ jobs:
           #       add some packages relevant to their specific variant, then afterwards push
           #       the cache again. When multiple buildahs push the dnf cache, they could invalidate
           #       the just-pushed cache of another builder instance, so some packages might
-          #       always be missing.
+          #       always be missing. SOLUTION: we give each containers dnf cache an individual
+          #       id, thus cache per variant.
           buildah bud \
             --pull \
             --squash \
