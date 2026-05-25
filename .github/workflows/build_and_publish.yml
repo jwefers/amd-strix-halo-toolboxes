@@ -100,6 +100,14 @@ jobs:
           #             has not ben invalidated. Needed since we pull from ze internet.
           # --cache-(to|from): pull/push the intermedia cache layers resulting from
           #                    --mount options in the Dockerfile
+          # NOTE: we are mounting cache layers for dnf and pushing them. This cache
+          #       layer is shared amongst all Dockerfiles, since they have the identical
+          #       mount parameter. When parallel building with buildah, those cache layers
+          #       compete. In parallel, they all pull the latest fitting cache, then maybe
+          #       add some packages relevant to their specific variant, then afterwards push
+          #       the cache again. When multiple buildahs push the dnf cache, they could invalidate
+          #       the just-pushed cache of another builder instance, so some packages might
+          #       always be missing.
           buildah bud \
             --pull \
             --squash \
@@ -117,7 +125,7 @@ jobs:
           podman run --rm "${LI}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
           podman run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
 
-          push with zstd:chunked compression, see https://github.com/containers/storage/blob/main/docs/containers-storage-zstd-chunked.md
+          # push with zstd:chunked compression, see https://github.com/containers/storage/blob/main/docs/containers-storage-zstd-chunked.md
 
           echo "→ Tag & push immutable → ${IMM}"
           buildah tag "${LI}" "${IMM}"
