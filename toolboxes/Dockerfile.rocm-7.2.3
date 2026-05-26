@@ -20,7 +20,7 @@ EOF
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
+RUN --mount=type=bind,source=cache/dnf,source,target=/var/cache/libdnf5,rw \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
@@ -41,13 +41,13 @@ ENV ROCM_PATH=/opt/rocm \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
@@ -67,7 +67,7 @@ RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
   mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
@@ -94,7 +94,7 @@ REPO
 EOF
 
 # runtime deps
-RUN --mount=type=cache,id=dnf-723,target=/var/cache/libdnf5 \
+RUN --mount=type=bind,source=cache/dnf,source,target=/var/cache/libdnf5,rw \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
