@@ -63,7 +63,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Cache podman storage for ${{ matrix.backend }}
+      - name: Create cache folder
+        run: |
+          mkdir -p toolboxes/cache
+
+      - name: Cache bind mounts for ${{ matrix.backend }}
         uses: actions/cache@v5
         with:
           key: podman-storage-${{ matrix.backend }}
