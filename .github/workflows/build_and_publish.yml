@@ -65,7 +65,7 @@ jobs:
 
       - name: Create cache folder
         run: |
-          mkdir -p toolboxes/cache
+          mkdir -p toolboxes/cache/{dnf,tmp,llama}
 
       - name: Cache bind mounts for ${{ matrix.backend }}
         uses: actions/cache@v5

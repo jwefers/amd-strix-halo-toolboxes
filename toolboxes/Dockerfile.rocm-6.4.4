@@ -7,7 +7,7 @@ FROM registry.fedoraproject.org/fedora:43 AS builder
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps + rocm toolchain (native fedora packages)
-RUN --mount=type=bind,source=cache/dnf,source,target=/var/cache/libdnf5,rw \
+RUN --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel \
@@ -50,7 +50,7 @@ FROM registry.fedoraproject.org/fedora-minimal:43
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps (native fedora rocm + utilities)
-RUN --mount=type=bind,source=cache/dnf,source,target=/var/cache/libdnf5,rw \
+RUN --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   install \
   bash ca-certificates libatomic libstdc++ libgcc libgomp sudo \
