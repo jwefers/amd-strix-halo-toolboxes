@@ -63,18 +63,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      # see https://github.com/containers/podman/discussions/17868
-      - name: Tar as root (setuid bit) to allow podman storage caching
-        run: sudo chmod u+s /usr/bin/tar
+      # # see https://github.com/containers/podman/discussions/17868
+      # - name: Tar as root (setuid bit) to allow podman storage caching
+      #   run: sudo chmod u+s /usr/bin/tar
 
-      - name: Cache podman storage for ${{ matrix.backend }}
+      - name: Cache bind mounts for ${{ matrix.backend }}
         uses: actions/cache@v5
         with:
           key: podman-storage-${{ matrix.backend }}
           restore-keys: |
-            podman-storage-${{ matrix.backend }}
             podman-storage
-          path: ~/.local/share/containers/storage
+          path: toolboxes/cache
 
       - name: Log in to Docker Hub
         env:
