@@ -63,9 +63,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      # # see https://github.com/containers/podman/discussions/17868
-      # - name: Tar as root (setuid bit) to allow podman storage caching
-      #   run: sudo chmod u+s /usr/bin/tar
+      # see https://github.com/containers/podman/discussions/17868
+      - name: Tar as root (setuid bit) to allow podman storage caching
+        run: sudo chmod u+s /usr/bin/tar
 
       - name: Create cache folder
         working-directory: toolboxes
