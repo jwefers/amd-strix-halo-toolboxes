@@ -86,8 +86,8 @@ jobs:
           file: Dockerfile.${{ matrix.backend }}
           push: false
           tags: |
-            $DOCKERHUB_REPO/${{ matrix.backend }}_$BUILD_TS
-            $DOCKERHUB_REPO/${{ matrix.backend }}
+            ${{ env.DOCKERHUB_REPO }}/${{ matrix.backend }}_${{ env.BUILD_TS }}
+            ${{ env.DOCKERHUB_REPO }}/${{ matrix.backend }}
           outputs: type=image,oci-mediatypes=true,compression=estargz,force-compression=true
           cache-to: type=gha,scope=${{ matrix.backend }}
           cache-from: type=gha,scope=${{ matrix.backend }}
