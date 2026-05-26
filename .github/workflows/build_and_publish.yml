@@ -72,6 +72,19 @@ jobs:
       - name: Set build timestamp
         run: echo "BUILD_TS=$(date +%Y%m%dT%H%M%S)" >> $GITHUB_ENV
 
+      - name: Docker build ${{ matrix.backend }}
+        uses: docker/build-push-action@v7
+        with:
+          context: toolboxes
+          file: Dockerfile.${{ matrix.backend }}
+          push: false
+          tags: |
+            $DOCKERHUB_REPO/${{ matrix.backend }}_$BUILD_TS
+            $DOCKERHUB_REPO/${{ matrix.backend }}
+          outputs: type=image,oci-mediatypes=true,compression=estargz,force-compression=true
+          cache-to: type=gha,scope=${{ matrix.backend }}
+          cache-from: type=gha,scope=${{ matrix.backend }}
+
       - name: Build & push ${{ matrix.backend }}
         working-directory: toolboxes
         shell: bash
@@ -85,18 +98,22 @@ jobs:
           IMM="${DOCKERHUB_REPO}:${TAG}"
           CHN="${DOCKERHUB_REPO}:${NAME}"
 
-          echo "→ Building ${DF}"
-          docker build --no-cache -t "${LI}" -f "${DF}" .
+          # echo "→ Building ${DF}"
+          # docker buildx build \
+          #   -o "type=registry,oci-mediatypes=true,compression=zstd,force-compression=true" \
+          #   --cache-to type=gha \
+          #   --cache-from type=gha \
+          #   --no-cache -t "${LI}" -f "${DF}" .
 
           echo "→ Running smoke test..."
-          docker run --rm "${LI}" llama version
-          docker run --rm "${LI}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
-          docker run --rm "${LI}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+          docker run --rm "${IMM}" llama version
+          docker run --rm "${IMM}" llama-cli --help || { status=$?; echo "llama-cli exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
+          docker run --rm "${IMM}" llama-server --help || { status=$?; echo "llama-server exited with status $status"; [[ $status -eq 0 || $status -eq 1 || $status -eq 134 ]]; }
 
           echo "→ Tag & push immutable → ${IMM}"
-          docker tag "${LI}" "${IMM}"
-          docker push "${IMM}"
+          # docker tag "${LI}" "${IMM}"
+          # docker push "${IMM}"
 
           echo "→ Tag & push channel → ${CHN}"
-          docker tag "${IMM}" "${CHN}"
-          docker push "${CHN}"
+          # docker tag "${IMM}" "${CHN}"
+          # docker push "${CHN}"
