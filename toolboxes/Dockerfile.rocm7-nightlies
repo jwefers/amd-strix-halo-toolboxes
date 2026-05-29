@@ -11,7 +11,7 @@ RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 # We can thus reuse the already-downloaded dnf packages
 # on subsequent runs, and the cache will NOT be part of
 # the resulting image, so we don't need to dnf clean.
-RUN --mount=type=cache,id=dnf-nightlies,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   dnf -y --nodocs --setopt=install_weak_deps=False install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel \
   radeontop git vim patch curl ninja-build tar xz aria2c
@@ -22,7 +22,7 @@ ARG ROCM_MAJOR_VER=7
 ARG GFX=gfx1151
 # We cache the downloaded tarball to avoid redownloading
 # if no newer version is present.
-RUN --mount=type=cache,id=rocm-nightlies-tmp,target=/tmp \
+RUN --mount=type=cache,target=/tmp \
   set -euo pipefail; \
   BASE="https://therock-nightly-tarball.s3.amazonaws.com"; \
   PREFIX="therock-dist-linux-${GFX}-${ROCM_MAJOR_VER}"; \
@@ -74,13 +74,13 @@ RUN printf '%s\n' \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
@@ -95,14 +95,14 @@ RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
 
 # keep bin; drop headers/docs/static libs (retain llama.cpp for rpc binaries)
 # TODO: combine with above nightly tarball download
-RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   find /opt/rocm-7.0 -type f -name '*.a' -delete \
   && rm -rf /opt/rocm-7.0/include /opt/rocm-7.0/share \
   /opt/rocm-7.0/llvm/include /opt/rocm-7.0/llvm/share
@@ -111,7 +111,7 @@ RUN --mount=type=cache,id=rocm-nightlies,target=/opt/llama.cpp \
 FROM registry.fedoraproject.org/fedora-minimal:43
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
-RUN --mount=type=cache,id=dnf-nightlies,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   microdnf -y --nodocs --setopt=install_weak_deps=0 install \
   bash ca-certificates libatomic libstdc++ libgcc radeontop vim procps-ng
 

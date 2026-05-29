@@ -46,7 +46,7 @@ ARG BRANCH=master
 
 
 # build
-COPY llama-grammar.patch /tmp/llama-grammar.patch
+COPY --link llama-grammar.patch /tmp/llama-grammar.patch
 ADD --link ${REPO}#${BRANCH} /opt/llama.cpp
 WORKDIR /opt/llama.cpp
 RUN --mount=type=cache,target=/opt/llama.cpp/build \

@@ -91,6 +91,7 @@ jobs:
           outputs: type=image,oci-mediatypes=true,compression=estargz,force-compression=true
           cache-to: type=gha,scope=${{ matrix.backend }}
           cache-from: type=gha,scope=${{ matrix.backend }}
+          no-cache-filters: builder,runtime
 
       - name: Build & push ${{ matrix.backend }}
         working-directory: toolboxes
