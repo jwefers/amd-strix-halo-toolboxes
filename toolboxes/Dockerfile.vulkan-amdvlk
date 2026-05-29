@@ -6,7 +6,7 @@ FROM registry.fedoraproject.org/fedora:43 AS builder
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   dnf -y --nodocs --setopt=install_weak_deps=False install \
   git vim \
   make gcc cmake ninja-build lld clang clang-devel compiler-rt libcurl-devel \
@@ -15,8 +15,8 @@ RUN --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
 
 # amdvlk
 RUN \
-  --mount=type=bind,source=cache/tmp,target=/tmp,rw \
-  --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
+  --mount=type=cache,target=/tmp \
+  --mount=type=cache,target=/var/cache/libdnf5 \
   test -f /tmp/amdvlk-2025.Q2.1.x86_64.rpm || \
   curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
   https://github.com/GPUOpen-Drivers/AMDVLK/releases/download/v-2025.Q2.1/amdvlk-2025.Q2.1.x86_64.rpm \
@@ -26,13 +26,13 @@ RUN \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
 
 # build
-RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   git reset --hard \
   && git pull \
   && git submodule update --recursive \
@@ -49,7 +49,7 @@ RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=bind,source=cache/llama,target=/opt/llama.cpp,rw \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/lib64/ \; \
   && ldconfig
 
@@ -63,14 +63,14 @@ FROM registry.fedoraproject.org/fedora-minimal:43
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # runtime deps
-RUN --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
   microdnf -y --nodocs --setopt=install_weak_deps=0 install \
   bash ca-certificates libatomic libstdc++ libgcc \
   vulkan-loader vulkan-loader-devel vulkaninfo mesa-vulkan-drivers radeontop procps-ng
 
 RUN \
-  --mount=type=bind,source=cache/tmp,target=/tmp,rw \
-  --mount=type=bind,source=cache/dnf,target=/var/cache/libdnf5,rw \
+  --mount=type=cache,target=/tmp \
+  --mount=type=cache,target=/var/cache/libdnf5 \
   test -f /tmp/amdvlk-2025.Q2.1.x86_64.rpm || \
   curl -L -o /tmp/amdvlk-2025.Q2.1.x86_64.rpm \
   https://github.com/GPUOpen-Drivers/AMDVLK/releases/download/v-2025.Q2.1/amdvlk-2025.Q2.1.x86_64.rpm \
