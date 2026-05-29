@@ -41,7 +41,7 @@ ENV ROCM_PATH=/opt/rocm \
 WORKDIR /opt/llama.cpp
 ARG REPO=https://github.com/ggerganov/llama.cpp.git
 ARG BRANCH=master
-RUN --mount=type=cache,id=rocm-723,target=/opt/llama.cpp \
+RUN --mount=type=cache,target=/opt/llama.cpp \
   test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY llama-grammar.patch /tmp/llama-grammar.patch
