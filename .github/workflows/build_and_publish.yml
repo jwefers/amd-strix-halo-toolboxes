@@ -78,15 +78,11 @@ jobs:
           driver: docker-container
           use: true
 
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-
       - name: Docker build ${{ matrix.backend }}
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: toolboxes/Dockerfile.${{ matrix.backend }}
+          context: "{{defaultContext}}:toolboxes"
+          file: Dockerfile.${{ matrix.backend }}
           push: false
           tags: |
             ${{ env.DOCKERHUB_REPO }}:${{ matrix.backend }}_${{ env.BUILD_TS }}
@@ -96,7 +92,10 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.backend }}
           no-cache-filters: builder,runtime
 
-      - name: Smoketest & push ${{ matrix.backend }}
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build & push ${{ matrix.backend }}
         working-directory: toolboxes
         shell: bash
         run: |
