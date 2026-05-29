@@ -85,8 +85,8 @@ jobs:
       - name: Docker build ${{ matrix.backend }}
         uses: docker/build-push-action@v7
         with:
-          context: ./toolboxes
-          file: Dockerfile.${{ matrix.backend }}
+          context: .
+          file: toolboxes/Dockerfile.${{ matrix.backend }}
           push: false
           tags: |
             ${{ env.DOCKERHUB_REPO }}:${{ matrix.backend }}_${{ env.BUILD_TS }}
