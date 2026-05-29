@@ -52,7 +52,7 @@ jobs:
         run: |
           sudo sh -c 'echo "deb http://archive.ubuntu.com/ubuntu resolute main universe" > /etc/apt/sources.list.d/resolute.list'
           sudo apt-get update
-          sudo apt-get install -y buildah
+          sudo apt-get install -y buildah podman conmon crun runc
 
       - name: Check out repository
         uses: actions/checkout@v6
