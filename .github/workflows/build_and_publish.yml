@@ -11,7 +11,7 @@ on:
         default: all
 
 env:
-  DOCKERHUB_REPO: docker.io/kyuz0/amd-strix-halo-toolboxes
+  DOCKERHUB_REPO: gitea.wefers.page/julian/amd-strix-halo-toolboxes
   LOCAL_PREFIX: llama
 
 jobs:
@@ -73,8 +73,8 @@ jobs:
 
       - name: Log in to Docker Hub
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
           sudo podman login gitea.wefers.page -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_TOKEN"
 
