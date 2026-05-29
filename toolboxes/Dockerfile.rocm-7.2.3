@@ -2,8 +2,7 @@
 FROM registry.fedoraproject.org/fedora:43 AS builder
 
 # rocm 7.2.3 repo
-RUN <<EOF
-tee /etc/yum.repos.d/rocm.repo <<REPO
+COPY <<'EOF' /etc/yum.repos.d/rocm.repo
 [ROCm-7.2.3]
 name=ROCm7.2.3
 baseurl=https://repo.radeon.com/rocm/rhel10/7.2.3/main
@@ -11,7 +10,6 @@ enabled=1
 priority=50
 gpgcheck=1
 gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
-REPO
 EOF
 
 # we want to keep ALL dnf downloaded packages in dnf cache,
