@@ -1,9 +1,8 @@
 # build stage
-FROM registry.fedoraproject.org/fedora:43 AS builder
+FROM registry.fedoraproject.org/fedora:44 AS builder
 
 # rocm 7.2.4 repo
-RUN <<'EOF'
-tee /etc/yum.repos.d/rocm.repo <<REPO
+COPY --link <<'EOF' /etc/yum.repos.d/rocm.repo
 [ROCm-7.2.4]
 name=ROCm7.2.4
 baseurl=https://repo.radeon.com/rocm/rhel10/7.2.4/main
@@ -11,19 +10,23 @@ enabled=1
 priority=50
 gpgcheck=1
 gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
-REPO
 EOF
 
+# we want to keep ALL dnf downloaded packages in dnf cache,
+# this is not the default, hackily add it to the config,
+# assume there is not much in it. should be improved
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
+
 # deps
-RUN dnf -y --nodocs --setopt=install_weak_deps=False \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+  dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
   make gcc cmake lld clang clang-devel compiler-rt libcurl-devel ninja-build rdma-core-devel \
   rocm-llvm rocm-device-libs hip-runtime-amd hip-devel \
   rocblas rocblas-devel hipblas hipblas-devel rocm-cmake libomp-devel libomp \
   rocminfo radeontop \
-  git-core vim sudo rsync patch \
-  && dnf clean all && rm -rf /var/cache/dnf/*
+  git-core vim sudo rsync patch
 
 # rocm env
 ENV ROCM_PATH=/opt/rocm \
@@ -32,17 +35,18 @@ ENV ROCM_PATH=/opt/rocm \
   HIP_DEVICE_LIB_PATH=/opt/rocm/amdgcn/bitcode \
   PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
 
-# ROCmFPX (llama.cpp fork with ROCmFP3/FP4/FP6/FP8 weight formats)
-WORKDIR /opt/llama.cpp
+# llama.cpp
 ARG REPO=https://github.com/charlie12345/ROCmFPX.git
 ARG BRANCH=main
-RUN git clone -b ${BRANCH} --single-branch ${REPO} .
 
-COPY llama-grammar.patch /tmp/llama-grammar.patch
+WORKDIR /opt/llama.cpp
+ADD --link --keep-git-dir ${REPO}#${BRANCH} /opt/llama.cpp
 
-# build — ROCm/HIP only
-# GGML_HIP_FORCE_MMQ=ON is required for ROCmFP4 MMQ kernels
+COPY --link llama-grammar.patch /tmp/llama-grammar.patch
+
+# build
 RUN git clean -xdf \
+  && git submodule update --recursive \
   && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build \
   -DGGML_HIP=ON \
@@ -66,20 +70,21 @@ RUN git clean -xdf \
   && cmake --install build --config Release
 
 # libs
-RUN mkdir -p /usr/local/lib64 \
+RUN --mount=type=cache,target=/opt/llama.cpp/build \
+  mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
 
 # helper
-COPY gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
+COPY --link gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
 RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
 
 # runtime stage
-FROM registry.fedoraproject.org/fedora-minimal:43
+FROM registry.fedoraproject.org/fedora-minimal:44 AS runtime
+RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # rocm 7.2.4 repo
-RUN <<'EOF'
-tee /etc/yum.repos.d/rocm.repo <<REPO
+COPY --link <<'EOF' /etc/yum.repos.d/rocm.repo
 [ROCm-7.2.4]
 name=ROCm7.2.4
 baseurl=https://repo.radeon.com/rocm/rhel10/7.2.4/main
@@ -87,21 +92,19 @@ enabled=1
 priority=50
 gpgcheck=1
 gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
-REPO
 EOF
 
 # runtime deps
-RUN microdnf -y --nodocs --setopt=install_weak_deps=0 \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+  microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
   bash ca-certificates libatomic libstdc++ libgcc libgomp libibverbs sudo \
   hip-runtime-amd rocblas hipblas \
-  rocminfo radeontop procps-ng \
-  && microdnf clean all && rm -rf /var/cache/dnf/*
+  rocminfo radeontop procps-ng
 
 # copy
 COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /opt/llama.cpp/build/bin/ggml-rpc-* /usr/local/bin/
 
 # ld
 RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
@@ -112,7 +115,7 @@ RUN echo "/usr/local/lib"  > /etc/ld.so.conf.d/local.conf \
   && ldconfig
 
 # helper
-COPY gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
+COPY --link gguf-vram-estimator.py /usr/local/bin/gguf-vram-estimator.py
 RUN chmod +x /usr/local/bin/gguf-vram-estimator.py
 
 # profile
