@@ -93,7 +93,7 @@ jobs:
 
           echo "→ Building ${DF}"
           docker buildx build \
-            -o "type=registry,oci-mediatypes=true,compression=zstd,force-compression=true" \
+            -o "type=image,oci-mediatypes=true,compression=zstd,force-compression=true" \
             --no-cache \
             -t "${LI}" \
             -f "${DF}" \
