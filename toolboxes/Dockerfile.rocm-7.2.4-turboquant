@@ -18,7 +18,7 @@ EOF
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
@@ -39,7 +39,7 @@ ENV ROCM_PATH=/opt/rocm \
 # llama.cpp
 ARG REPO=https://github.com/TheTom/llama-cpp-turboquant.git
 ARG BRANCH=master
-# RUN --mount=type=cache,target=/opt/llama.cpp \
+# RUN --mount=type=cache,target=/opt/llama.cpp,sharing=locked \
 # test -d .git || git clone -b ${BRANCH} --single-branch --recursive ${REPO} .
 
 COPY --link llama-grammar.patch /tmp/llama-grammar.patch
@@ -49,7 +49,7 @@ ADD --link --keep-git-dir ${REPO}#${BRANCH} /opt/llama.cpp
 
 
 # build
-RUN --mount=type=cache,target=/opt/llama.cpp/build \
+RUN --mount=type=cache,target=/opt/llama.cpp/build,sharing=locked \
   git submodule update --recursive \
   && patch -p1 < /tmp/llama-grammar.patch \
   && cmake -S . -B build \
@@ -66,7 +66,7 @@ RUN --mount=type=cache,target=/opt/llama.cpp/build \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=cache,target=/opt/llama.cpp/build \
+RUN --mount=type=cache,target=/opt/llama.cpp/build,sharing=locked \
   mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
@@ -91,7 +91,7 @@ gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
 EOF
 
 # runtime deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \

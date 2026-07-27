@@ -18,7 +18,7 @@ EOF
 RUN echo 'keepcache=True' >> /etc/dnf/dnf.conf
 
 # deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
   dnf -y --nodocs --setopt=install_weak_deps=False \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
@@ -70,7 +70,7 @@ RUN git clean -xdf \
   && cmake --install build --config Release
 
 # libs
-RUN --mount=type=cache,target=/opt/llama.cpp/build \
+RUN --mount=type=cache,target=/opt/llama.cpp/build,sharing=locked \
   mkdir -p /usr/local/lib64 \
   && find /opt/llama.cpp/build -type f -name 'lib*.so*' -exec cp {} /usr/local/lib64/ \; \
   && ldconfig
@@ -95,7 +95,7 @@ gpgkey=https://repo.radeon.com/rocm/rocm.gpg.key
 EOF
 
 # runtime deps
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
   microdnf -y --nodocs --setopt=install_weak_deps=0 \
   --exclude='*sdk*' --exclude='*samples*' --exclude='*-doc*' --exclude='*-docs*' \
   install \
